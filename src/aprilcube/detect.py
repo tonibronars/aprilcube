@@ -338,6 +338,31 @@ def estimate_pose(
                 confidence=0.99,
                 flags=cv2.SOLVEPNP_ITERATIVE,
             )
+        # Minimal RANSAC subsets can be unstable for a fully planar board.
+        # Also fit all corners directly, retaining the lower-error candidate;
+        # the caller still applies its reprojection and facing checks.
+        if np.linalg.matrix_rank(object_points - object_points.mean(axis=0)) == 2:
+            try:
+                plane_ok, plane_rvec, plane_tvec = cv2.solvePnP(
+                    object_points, image_points, camera_matrix, dist_coeffs,
+                    flags=cv2.SOLVEPNP_SQPNP,
+                )
+            except cv2.error:
+                plane_ok = False  # An optional candidate must not discard a valid RANSAC fit.
+            if plane_ok:
+                plane_pixels, _ = cv2.projectPoints(
+                    object_points, plane_rvec, plane_tvec, camera_matrix, dist_coeffs)
+                plane_error = np.mean(np.linalg.norm(
+                    image_points - plane_pixels.reshape(-1, 2), axis=1))
+                ransac_error = float("inf")
+                if success:
+                    ransac_pixels, _ = cv2.projectPoints(
+                        object_points, rvec, tvec, camera_matrix, dist_coeffs)
+                    ransac_error = np.mean(np.linalg.norm(
+                        image_points - ransac_pixels.reshape(-1, 2), axis=1))
+                if plane_error < ransac_error:
+                    success, rvec, tvec = True, plane_rvec, plane_tvec
+                    inliers = np.arange(n_points).reshape(-1, 1)
     else:
         try:
             success, rvec, tvec = cv2.solvePnP(
