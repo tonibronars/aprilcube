@@ -21,10 +21,14 @@ from aprilcube.detect import (
     build_tag_corner_map,
 )
 
+from aprilcube.measurement import TargetDetector, TargetDetection
+
 __all__ = [
     "detector",
     "CubeConfig",
     "CubePoseEstimator",
+    "TargetDetector",
+    "TargetDetection",
     "KalmanFilterConfig",
     "KalmanPoseFilter",
     "MarkerDetection",
