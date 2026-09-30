@@ -1187,8 +1187,8 @@ class CubePoseEstimator:
         detections: list[tuple[int, np.ndarray]] = []
         seen_ids: set[int] = set()
         if ids is not None:
-            for i in range(len(ids)):
-                tag_id = int(ids[i][0])
+            for i, detected_id in enumerate(np.asarray(ids).reshape(-1)):
+                tag_id = int(detected_id)
                 if tag_id in self.valid_ids:
                     detections.append((tag_id, corners_list[i].reshape(4, 2)))
                     seen_ids.add(tag_id)
@@ -1202,8 +1202,8 @@ class CubePoseEstimator:
             except cv2.error:
                 fb_corners, fb_ids, fb_rejected = (), None, ()
             if fb_ids is not None:
-                for i in range(len(fb_ids)):
-                    tag_id = int(fb_ids[i][0])
+                for i, detected_id in enumerate(np.asarray(fb_ids).reshape(-1)):
+                    tag_id = int(detected_id)
                     if tag_id in self.valid_ids and tag_id not in seen_ids:
                         detections.append((tag_id, fb_corners[i].reshape(4, 2)))
                         seen_ids.add(tag_id)
@@ -1220,7 +1220,10 @@ class CubePoseEstimator:
         # Recover rejected candidates using predicted pose geometry.
         # Rejected quads failed bit-decoding (e.g. from blur) but may still
         # correspond to real tags. Match them against projected tag positions.
-        all_rejected = list(rejected or []) + list(fb_rejected or [])
+        # OpenCV 5 returns rejected candidates as one array, whose truth value is ambiguous.
+        all_rejected = list(rejected) if rejected is not None else []
+        if fb_rejected is not None:
+            all_rejected.extend(fb_rejected)
         if all_rejected and self.prev_rvec is not None:
             detections = self._recover_rejected(
                 detections, seen_ids, all_rejected,
